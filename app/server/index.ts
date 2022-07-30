@@ -1,13 +1,18 @@
 import express from "express";
+import mjml2html from "mjml";
 import { WebSocketServer } from "ws";
 import path from "path";
 import open from "open";
-import { attach } from "neovim";
+import { attach, NeovimClient } from "neovim";
+
+async function getCurrentBuffer(nvim: NeovimClient) {
+  const buf = await nvim.buffer;
+  const lines = await buf.lines;
+  return lines.join("\n");
+}
 
 (async () => {
   const nvim = attach({ reader: process.stdin, writer: process.stdout });
-
-  nvim.command("vsp");
 
   const app = express();
   const PORT = 5000;
@@ -20,19 +25,14 @@ import { attach } from "neovim";
   });
 
   wss.on("connection", (socket) => {
-    let i = 0;
-    socket.on("message", (message) => {
-      i++;
+    socket.on("message", async () => {
+      const mjml = await getCurrentBuffer(nvim);
+      const { html } = mjml2html(mjml);
+
       socket.send(
         JSON.stringify({
           type: "html",
-          message: `<h1>${i}</h1>`,
-        })
-      );
-      socket.send(
-        JSON.stringify({
-          type: "log",
-          message,
+          message: html,
         })
       );
     });

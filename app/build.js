@@ -9,13 +9,16 @@ vite.build({
   build: {
     minify: false,
     outDir: "dist/public/",
+    sourcemap: true,
   },
 });
 
 esbuild.build({
+  external: ["mjml"],
   bundle: true,
   entryPoints: ["server/index.ts"],
   outfile: "dist/server.js",
   platform: "node",
   target: ["node16"],
+  sourcemap: true,
 });
