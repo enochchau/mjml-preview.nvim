@@ -22,15 +22,24 @@ import { attach } from "neovim";
   wss.on("connection", (socket) => {
     let i = 0;
     socket.on("message", (message) => {
-      console.log("Recieved:", message.toString());
       i++;
-      socket.send(`<h1>${i}</h1>`);
+      socket.send(
+        JSON.stringify({
+          type: "html",
+          message: `<h1>${i}</h1>`,
+        })
+      );
+      socket.send(
+        JSON.stringify({
+          type: "log",
+          message,
+        })
+      );
     });
   });
 
   const server = app.listen(PORT, () => {
     const url = `http://localhost:${PORT}`;
-    console.log(`Listening on ${url}`);
     open(url);
   });
 

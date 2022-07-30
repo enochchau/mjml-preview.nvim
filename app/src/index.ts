@@ -9,7 +9,11 @@ if (root) {
     console.log("WS was closed", ev);
   };
   ws.onmessage = (ev) => {
-    root.innerHTML = ev.data;
+    const { type, message } = JSON.parse(ev.data);
+    console.log({ type, message });
+    if (type === "html") {
+      root.innerHTML = message;
+    }
   };
   setInterval(() => {
     ws.send("GIMMIEDALOOT");
