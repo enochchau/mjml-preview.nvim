@@ -14,6 +14,7 @@ vite.build({
 });
 
 esbuild.build({
+  logLevel: "info",
   external: ["mjml"],
   bundle: true,
   entryPoints: ["server/index.ts"],
