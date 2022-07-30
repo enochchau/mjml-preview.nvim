@@ -11,10 +11,11 @@ M.spawn_server = function(script_path)
 		on_exit = function(...)
 			debug("exiting mjml preview server:")
 			debug(vim.inspect({ ... }))
+
 			vim.g.mjml_preview_channel = nil
 		end,
 		on_stderr = function(channel, message, type)
-			print(channel, type, vim.inspect(message))
+			debug(channel, type, vim.inspect(message))
 		end,
 	})
 end
@@ -29,6 +30,7 @@ end
 
 M.kill_job = function()
 	vim.fn.jobstop(vim.g.mjml_preview_channel)
+	vim.g.mjml_preview_channel = nil
 end
 
 return M
