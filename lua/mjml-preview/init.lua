@@ -25,6 +25,10 @@ local function notify(method)
 	vim.rpcnotify(vim.g.mjml_preview_channel, method, vim.fn.bufnr("%"))
 end
 
+local function request(method)
+	return vim.rpcrequest(vim.g.mjml_preview_channel, method, vim.fn.bufnr("%"))
+end
+
 M.send_write = function()
 	notify("write")
 end
@@ -35,6 +39,15 @@ end
 
 M.send_close = function()
 	notify("close")
+end
+
+M.toggle = function()
+	local is_open = request("check_open")
+	if is_open == "true" then
+		M.send_close()
+	else
+		M.send_open()
+	end
 end
 
 M.kill_job = function()

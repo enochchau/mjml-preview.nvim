@@ -1,6 +1,6 @@
 export {};
 
-const WS_URL = "ws://localhost:5000/ws";
+const WS_URL = "ws://localhost:55476/ws";
 
 const root = document.getElementById("root");
 if (root && root instanceof HTMLIFrameElement) {

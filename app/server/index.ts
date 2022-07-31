@@ -5,7 +5,7 @@ import path from "path";
 import open from "open";
 import { attach, Buffer } from "neovim";
 
-const PORT = 5000;
+const PORT = 55476;
 const HOST = "localhost";
 const URL = `http://${HOST}:${PORT}`;
 
@@ -22,6 +22,11 @@ type RPCNotify =
       method: "open";
       args: [string];
     };
+
+type RPCRequest = {
+  method: "check_open";
+  args: [string];
+};
 
 /**
  * Websocket message schema
@@ -78,6 +83,24 @@ nvim.on("notification", async (method: string, args: string[]) => {
     }
   }
 });
+
+nvim.on(
+  "request",
+  async (
+    method: string,
+    args: string[],
+    resp: { send: (...args: string[]) => void }
+  ) => {
+    const rpcFn = { method, args } as RPCRequest;
+    const bufnr = args[0];
+    switch (rpcFn.method) {
+      case "check_open": {
+        const is_open = BufferSockets.has(bufnr);
+        resp.send(is_open.toString());
+      }
+    }
+  }
+);
 
 (async () => {
   const app = express();
