@@ -1,6 +1,6 @@
 import http from "http";
 import fs from "fs";
-import mjml2html from "mjml";
+import mjml2html from "mjml-core";
 import { WebSocketServer, WebSocket } from "ws";
 import path from "path";
 import open from "open";
