@@ -37,7 +37,7 @@ type RPCRequest = {
 /**
  * Websocket message schema
  */
-type WsMessage =
+export type WsMessage =
   | {
       type: "html";
       message: string;
@@ -82,12 +82,10 @@ async function buf2Html(buf: Buffer) {
 async function sendMjmlBuf(socket: WebSocket, buf: Buffer) {
   const { html, errors } = await buf2Html(buf);
   socketSend(socket, { type: "html", message: html });
-  if (errors.length > 0) {
-    socketSend(socket, {
-      type: "error",
-      message: errors.map((e) => e.formattedMessage),
-    });
-  }
+  socketSend(socket, {
+    type: "error",
+    message: errors.map((e) => e.formattedMessage),
+  });
 }
 
 const nvim = attach({ reader: process.stdin, writer: process.stdout });
@@ -149,12 +147,14 @@ nvim.on(
   });
 
   wsServer.on("connection", async (socket) => {
+    const bufnr = UnattachedBuffers.pop();
+    if (!bufnr) return;
+
     socket.on("close", () => {
       // auto-clean up
       BufferSockets.delete(bufnr);
     });
 
-    const bufnr = UnattachedBuffers.pop();
     if (BufferSockets.has(bufnr)) {
       socket.close();
     }
@@ -163,6 +163,7 @@ nvim.on(
     const buffer = buffers.find((b) => b.id === parseInt(bufnr));
     if (!buffer) {
       socket.close();
+      return;
     }
     BufferSockets.set(bufnr, { socket, buffer });
     sendMjmlBuf(socket, buffer);
