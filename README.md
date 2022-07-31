@@ -27,10 +27,10 @@ MjmlPreviewClose - Close the mjml preview
 
 MJML is rendered in an iframe.
 
-![Example](./screenshots/example.png)
+![Example](./assets/example.png)
 
 Error messages are also displayed in the window.
-![Error](./screenshots/error.png)
+![Error](./assets/error.png)
 
 ## Related Projects
 
