@@ -15,7 +15,7 @@ vite.build({
 
 esbuild.build({
   logLevel: "info",
-  external: ["mjml"],
+  external: ["uglify-js"],
   bundle: true,
   entryPoints: ["server/index.ts"],
   outfile: "dist/server.js",

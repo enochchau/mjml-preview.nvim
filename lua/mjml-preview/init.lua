@@ -55,4 +55,8 @@ M.kill_job = function()
 	vim.g.mjml_preview_channel = nil
 end
 
+M.is_active = function()
+	return vim.g.mjml_preview_channel
+end
+
 return M

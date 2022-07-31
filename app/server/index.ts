@@ -9,6 +9,9 @@ const PORT = 55476;
 const HOST = "localhost";
 const URL = `http://${HOST}:${PORT}`;
 
+/**
+ * Types for RPC notify
+ */
 type RPCNotify =
   | {
       method: "write";
@@ -23,6 +26,9 @@ type RPCNotify =
       args: [string];
     };
 
+/**
+ * Types for RPC request
+ */
 type RPCRequest = {
   method: "check_open";
   args: [string];
@@ -31,10 +37,15 @@ type RPCRequest = {
 /**
  * Websocket message schema
  */
-type WsMessage = {
-  type: "html";
-  message: string;
-};
+type WsMessage =
+  | {
+      type: "html";
+      message: string;
+    }
+  | {
+      type: "error";
+      message: string[];
+    };
 
 // track unattached buffers
 const UnattachedBuffers: string[] = [];
@@ -42,15 +53,41 @@ const UnattachedBuffers: string[] = [];
 // tracks buffer ids to its associated web socket client and nvim buffer
 const BufferSockets = new Map<string, { socket: WebSocket; buffer: Buffer }>();
 
+/**
+ * Type safe wrapper for sending ws messages
+ * @param socket - web socket client
+ * @param message - message
+ * @returns
+ */
 function socketSend(socket: WebSocket, message: WsMessage) {
   return socket.send(JSON.stringify(message));
 }
 
+/**
+ * Transform a nvim buffer of mjml into html
+ * @param buf - buffer
+ * @returns html
+ */
 async function buf2Html(buf: Buffer) {
   const lines = await buf.lines;
   const mjml = lines.join("\n");
-  const { html } = mjml2html(mjml);
-  return html;
+  return mjml2html(mjml);
+}
+
+/**
+ * Convert and send the buffer to the web socket client
+ * @param socket - ws client socket
+ * @param buf - nvim buffer
+ */
+async function sendMjmlBuf(socket: WebSocket, buf: Buffer) {
+  const { html, errors } = await buf2Html(buf);
+  socketSend(socket, { type: "html", message: html });
+  if (errors.length > 0) {
+    socketSend(socket, {
+      type: "error",
+      message: errors.map((e) => e.formattedMessage),
+    });
+  }
 }
 
 const nvim = attach({ reader: process.stdin, writer: process.stdout });
@@ -62,14 +99,14 @@ nvim.on("notification", async (method: string, args: string[]) => {
     case "open":
       if (!BufferSockets.has(bufnr)) {
         open(URL);
+        // push into unattached buffers, this will get picked up when a new ws client connects
         UnattachedBuffers.push(bufnr);
       }
       break;
     case "write": {
       const bs = BufferSockets.get(bufnr);
       if (bs) {
-        const html = await buf2Html(bs.buffer);
-        socketSend(bs.socket, { type: "html", message: html });
+        sendMjmlBuf(bs.socket, bs.buffer);
       }
       break;
     }
@@ -77,7 +114,6 @@ nvim.on("notification", async (method: string, args: string[]) => {
       const bs = BufferSockets.get(bufnr);
       if (bs) {
         bs.socket.close();
-        BufferSockets.delete(bufnr);
       }
       break;
     }
@@ -107,13 +143,14 @@ nvim.on(
 
   app.use("/", express.static(path.join(__dirname, "public")));
 
-  const wss = new WebSocketServer({
+  const wsServer = new WebSocketServer({
     noServer: true,
     path: "/ws",
   });
 
-  wss.on("connection", async (socket) => {
+  wsServer.on("connection", async (socket) => {
     socket.on("close", () => {
+      // auto-clean up
       BufferSockets.delete(bufnr);
     });
 
@@ -125,21 +162,17 @@ nvim.on(
     const buffers = await nvim.buffers;
     const buffer = buffers.find((b) => b.id === parseInt(bufnr));
     if (!buffer) {
-      BufferSockets.delete(bufnr);
       socket.close();
     }
-
-    const initialHtml = await buf2Html(buffer);
-    socketSend(socket, { type: "html", message: initialHtml });
-
     BufferSockets.set(bufnr, { socket, buffer });
+    sendMjmlBuf(socket, buffer);
   });
 
   const server = app.listen(PORT);
 
   server.on("upgrade", (req, socket, head) => {
-    wss.handleUpgrade(req, socket, head, (socket) => {
-      wss.emit("connection", socket, req);
+    wsServer.handleUpgrade(req, socket, head, (socket) => {
+      wsServer.emit("connection", socket, req);
     });
   });
 })();

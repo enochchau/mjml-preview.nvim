@@ -29,9 +29,13 @@ local function autocmd(events, callback)
 end
 
 autocmd("BufDelete", function()
-	require("mjml-preview").send_close()
+	if require("mjml-preview").is_active() then
+		require("mjml-preview").send_close()
+	end
 end)
 
 autocmd({ "TextChanged", "TextChangedI" }, function()
-	require("mjml-preview").send_write()
+	if require("mjml-preview").is_active() then
+		require("mjml-preview").send_write()
+	end
 end)

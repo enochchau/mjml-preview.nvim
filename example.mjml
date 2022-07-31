@@ -5,7 +5,7 @@
         <mj-text>
           Hello World!
         </mj-text>
-        <mj-text>
+        <mj-text color="red">
           Hello World
         </mj-text>
       </mj-column>
