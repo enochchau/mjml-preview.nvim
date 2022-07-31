@@ -1,4 +1,5 @@
-import express from "express";
+import http from "http";
+import fs from "fs";
 import mjml2html from "mjml";
 import { WebSocketServer, WebSocket } from "ws";
 import path from "path";
@@ -88,58 +89,74 @@ async function sendMjmlBuf(socket: WebSocket, buf: Buffer) {
   });
 }
 
-const nvim = attach({ reader: process.stdin, writer: process.stdout });
+function setupNvim() {
+  const nvim = attach({ reader: process.stdin, writer: process.stdout });
 
-nvim.on("notification", async (method: string, args: string[]) => {
-  const rpcFn = { method, args } as RPCNotify;
-  const bufnr = args[0];
-  switch (rpcFn.method) {
-    case "open":
-      if (!BufferSockets.has(bufnr)) {
-        open(URL);
-        // push into unattached buffers, this will get picked up when a new ws client connects
-        UnattachedBuffers.push(bufnr);
-      }
-      break;
-    case "write": {
-      const bs = BufferSockets.get(bufnr);
-      if (bs) {
-        sendMjmlBuf(bs.socket, bs.buffer);
-      }
-      break;
-    }
-    case "close": {
-      const bs = BufferSockets.get(bufnr);
-      if (bs) {
-        bs.socket.close();
-      }
-      break;
-    }
-  }
-});
-
-nvim.on(
-  "request",
-  async (
-    method: string,
-    args: string[],
-    resp: { send: (...args: string[]) => void }
-  ) => {
-    const rpcFn = { method, args } as RPCRequest;
+  nvim.on("notification", async (method: string, args: string[]) => {
+    const rpcFn = { method, args } as RPCNotify;
     const bufnr = args[0];
     switch (rpcFn.method) {
-      case "check_open": {
-        const is_open = BufferSockets.has(bufnr);
-        resp.send(is_open.toString());
+      case "open":
+        if (!BufferSockets.has(bufnr)) {
+          open(URL);
+          // push into unattached buffers, this will get picked up when a new ws client connects
+          UnattachedBuffers.push(bufnr);
+        }
+        break;
+      case "write": {
+        const bs = BufferSockets.get(bufnr);
+        if (bs) {
+          sendMjmlBuf(bs.socket, bs.buffer);
+        }
+        break;
+      }
+      case "close": {
+        const bs = BufferSockets.get(bufnr);
+        if (bs) {
+          bs.socket.close();
+        }
+        break;
       }
     }
-  }
-);
+  });
+
+  nvim.on(
+    "request",
+    async (
+      method: string,
+      args: string[],
+      resp: { send: (...args: string[]) => void }
+    ) => {
+      const rpcFn = { method, args } as RPCRequest;
+      const bufnr = args[0];
+      switch (rpcFn.method) {
+        case "check_open": {
+          const is_open = BufferSockets.has(bufnr);
+          resp.send(is_open.toString());
+        }
+      }
+    }
+  );
+  return nvim;
+}
 
 (async () => {
-  const app = express();
+  const nvim = setupNvim();
 
-  app.use("/", express.static(path.join(__dirname, "public")));
+  // static file server
+  const server = http.createServer((req, res) => {
+    if (req.url === "/" || !req.url) req.url = "index.html";
+    const r = path.join(__dirname, "public", req.url);
+    fs.readFile(r, (err, data) => {
+      if (err) {
+        res.writeHead(404);
+        res.end(JSON.stringify(err));
+        return;
+      }
+      res.writeHead(200);
+      res.end(data);
+    });
+  });
 
   const wsServer = new WebSocketServer({
     noServer: true,
@@ -169,11 +186,11 @@ nvim.on(
     sendMjmlBuf(socket, buffer);
   });
 
-  const server = app.listen(PORT);
-
   server.on("upgrade", (req, socket, head) => {
     wsServer.handleUpgrade(req, socket, head, (socket) => {
       wsServer.emit("connection", socket, req);
     });
   });
+
+  server.listen(PORT);
 })();
