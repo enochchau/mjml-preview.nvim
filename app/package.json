@@ -16,7 +16,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@types/mjml-core": "^4.7.1",
+    "@types/mjml": "^4.7.0",
     "@types/ws": "^8.5.3",
     "@typescript-eslint/eslint-plugin": "^5.31.0",
     "@typescript-eslint/parser": "^5.31.0",
@@ -27,7 +27,7 @@
     "typescript": "^4.7.4"
   },
   "dependencies": {
-    "mjml-core": "^4.13.0",
+    "mjml": "^4.13.0",
     "neovim": "^4.10.1",
     "open": "^8.4.0",
     "ws": "^8.8.1"

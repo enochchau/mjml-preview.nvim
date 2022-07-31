@@ -19,7 +19,7 @@ esbuild
 
 esbuild.build({
   logLevel: "info",
-  external: ["uglify-js"],
+  external: ["mjml"],
   bundle: true,
   entryPoints: ["server/index.ts"],
   outfile: "dist/server.js",

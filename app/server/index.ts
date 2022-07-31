@@ -1,6 +1,6 @@
 import http from "http";
 import fs from "fs";
-import mjml2html from "mjml-core";
+import mjml2html from "mjml";
 import { WebSocketServer, WebSocket } from "ws";
 import path from "path";
 import open from "open";
@@ -65,28 +65,28 @@ function socketSend(socket: WebSocket, message: WsMessage) {
 }
 
 /**
- * Transform a nvim buffer of mjml into html
- * @param buf - buffer
- * @returns html
- */
-async function buf2Html(buf: Buffer) {
-  const lines = await buf.lines;
-  const mjml = lines.join("\n");
-  return mjml2html(mjml);
-}
-
-/**
  * Convert and send the buffer to the web socket client
  * @param socket - ws client socket
  * @param buf - nvim buffer
  */
 async function sendMjmlBuf(socket: WebSocket, buf: Buffer) {
-  const { html, errors } = await buf2Html(buf);
-  socketSend(socket, { type: "html", message: html });
-  socketSend(socket, {
-    type: "error",
-    message: errors.map((e) => e.formattedMessage),
-  });
+  const lines = await buf.lines;
+  const mjml = lines.join("\n");
+  try {
+    const { html, errors } = mjml2html(mjml);
+    socketSend(socket, { type: "html", message: html });
+    socketSend(socket, {
+      type: "error",
+      message: errors.map((e) => e.formattedMessage),
+    });
+  } catch (err) {
+    if (err instanceof Error) {
+      socketSend(socket, {
+        type: "error",
+        message: [err.message, mjml],
+      });
+    }
+  }
 }
 
 function setupNvim() {
