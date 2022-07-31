@@ -3,13 +3,14 @@ local debug = require("mjml-preview.debug")
 
 M.spawn_server = function(script_path)
 	if vim.g.mjml_preview_channel ~= nil then
+		debug("preview channel is already open")
 		return
 	end
 
 	vim.g.mjml_preview_channel = vim.fn.jobstart({ "node", "--enable-source-maps", script_path }, {
 		rpc = true,
 		on_exit = function(...)
-			debug("exiting mjml preview server:")
+			debug("exiting:")
 			debug(vim.inspect({ ... }))
 
 			vim.g.mjml_preview_channel = nil
@@ -20,12 +21,20 @@ M.spawn_server = function(script_path)
 	})
 end
 
+local function notify(method)
+	vim.rpcnotify(vim.g.mjml_preview_channel, method, vim.fn.bufnr("%"))
+end
+
 M.send_write = function()
-	vim.rpcnotify(vim.g.mjml_preview_channel, "write")
+	notify("write")
+end
+
+M.send_open = function()
+	notify("open")
 end
 
 M.send_close = function()
-	vim.rpcnotify(vim.g.mjml_preview_channel, "close")
+	notify("close")
 end
 
 M.kill_job = function()
