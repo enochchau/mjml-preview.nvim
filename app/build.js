@@ -1,4 +1,5 @@
 const vite = require("vite");
+const cp = require("child_process");
 const esbuild = require("esbuild");
 const fs = require("fs");
 
@@ -23,3 +24,8 @@ esbuild.build({
   target: ["node16"],
   sourcemap: true,
 });
+
+fs.copyFileSync("build_artifacts/package.json", "dist/package.json");
+fs.copyFileSync("build_artifacts/package-lock.json", "dist/package-lock.json");
+
+cp.execSync("cd dist && npm install", { stdio: "inherit" });
