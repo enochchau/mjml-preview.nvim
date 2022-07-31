@@ -1,6 +1,6 @@
 # mjml-preview.nvim
 
-Preview mjml files in the browser with Neovim.
+Preview [mjml](https://mjml.io/) files in the browser with Neovim.
 Mjml is hot reloaded so you'll always see the most updated render.
 
 ## Installation
