@@ -16,7 +16,7 @@ use {
 ## Commands
 
 ```
-MjmlToggle - toggle the mjml preview
+MjmlPreviewToggle - toggle the mjml preview
 MjmlPreviewOpen - Preview mjml for the current buffer
 MjmlPreviewClose - Close the mjml preview
 ```
