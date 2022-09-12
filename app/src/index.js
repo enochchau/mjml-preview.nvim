@@ -1,75 +1,40 @@
-import http from "http";
-import fs from "fs";
-import mjml2html from "mjml";
-import { WebSocketServer, WebSocket } from "ws";
-import path from "path";
-import open from "open";
-import { attach, Buffer } from "neovim";
+const http = require("http");
+const process = require("process");
+const fs = require("fs");
+const mjml2html = require("mjml");
+const { WebSocketServer } = require("ws");
+const path = require("path");
+const open = require("open");
+const { attach } = require("neovim");
 
 const PORT = 55476;
 const HOST = "localhost";
 const URL = `http://${HOST}:${PORT}`;
 
-/**
- * Types for RPC notify
- */
-type RPCNotify =
-  | {
-      method: "write";
-      args: [string];
-    }
-  | {
-      method: "close";
-      args: [string];
-    }
-  | {
-      method: "open";
-      args: [string];
-    };
-
-/**
- * Types for RPC request
- */
-type RPCRequest = {
-  method: "check_open";
-  args: [string];
-};
-
-/**
- * Websocket message schema
- */
-export type WsMessage =
-  | {
-      type: "html";
-      message: string;
-    }
-  | {
-      type: "error";
-      message: string[];
-    };
-
 // track unattached buffers
-const UnattachedBuffers: string[] = [];
+/** @type {string[]} */
+const UnattachedBuffers = [];
 
 // tracks buffer ids to its associated web socket client and nvim buffer
-const BufferSockets = new Map<string, { socket: WebSocket; buffer: Buffer }>();
+/** @type {Map<string, {socket: WebSocket, buffer: import("neovim").Buffer}>} */
+const BufferSockets = new Map();
 
 /**
  * Type safe wrapper for sending ws messages
- * @param socket - web socket client
- * @param message - message
+ * @param {import("ws").WebSocket} socket - web socket client
+ * @param {import("./").WsMessage} message - message
  * @returns
  */
-function socketSend(socket: WebSocket, message: WsMessage) {
+function socketSend(socket, message) {
   return socket.send(JSON.stringify(message));
 }
 
 /**
  * Convert and send the buffer to the web socket client
- * @param socket - ws client socket
- * @param buf - nvim buffer
+ * @param {import("ws").WebSocket} socket - ws client socket
+ * @param {import("neovim").Buffer} buf - nvim buffer
  */
-async function sendMjmlBuf(socket: WebSocket, buf: Buffer) {
+async function sendMjmlBuf(socket, buf) {
   const lines = await buf.lines;
   const mjml = lines.join("\n");
   try {
@@ -92,42 +57,52 @@ async function sendMjmlBuf(socket: WebSocket, buf: Buffer) {
 function setupNvim() {
   const nvim = attach({ reader: process.stdin, writer: process.stdout });
 
-  nvim.on("notification", async (method: string, args: string[]) => {
-    const rpcFn = { method, args } as RPCNotify;
-    const bufnr = args[0];
-    switch (rpcFn.method) {
-      case "open":
-        if (!BufferSockets.has(bufnr)) {
-          open(URL);
-          // push into unattached buffers, this will get picked up when a new ws client connects
-          UnattachedBuffers.push(bufnr);
+  nvim.on(
+    "notification",
+    /**
+     * @param {string} method
+     * @param {string[]} args
+     */
+    async (method, args) => {
+      /** @type {import("./").RPCNotify} */
+      const rpcFn = { method, args };
+      const bufnr = args[0];
+      switch (rpcFn.method) {
+        case "open":
+          if (!BufferSockets.has(bufnr)) {
+            open(URL);
+            // push into unattached buffers, this will get picked up when a new ws client connects
+            UnattachedBuffers.push(bufnr);
+          }
+          break;
+        case "write": {
+          const bs = BufferSockets.get(bufnr);
+          if (bs) {
+            sendMjmlBuf(bs.socket, bs.buffer);
+          }
+          break;
         }
-        break;
-      case "write": {
-        const bs = BufferSockets.get(bufnr);
-        if (bs) {
-          sendMjmlBuf(bs.socket, bs.buffer);
+        case "close": {
+          const bs = BufferSockets.get(bufnr);
+          if (bs) {
+            bs.socket.close();
+          }
+          break;
         }
-        break;
-      }
-      case "close": {
-        const bs = BufferSockets.get(bufnr);
-        if (bs) {
-          bs.socket.close();
-        }
-        break;
       }
     }
-  });
+  );
 
   nvim.on(
     "request",
-    async (
-      method: string,
-      args: string[],
-      resp: { send: (...args: string[]) => void }
-    ) => {
-      const rpcFn = { method, args } as RPCRequest;
+    /**
+     * @param {string} method
+     * @param {string[]} args
+     * @param {{send: (...args: string[]) => void }} rsp
+     */
+    async (method, args, resp) => {
+      /** @type {import("./").RPCRequest} */
+      const rpcFn = { method, args };
       const bufnr = args[0];
       switch (rpcFn.method) {
         case "check_open": {

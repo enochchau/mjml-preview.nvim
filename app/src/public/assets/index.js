@@ -1,5 +1,3 @@
-import { WsMessage } from "../server/index";
-
 const WS_URL = "ws://localhost:55476/ws";
 
 const root = document.getElementById("root");
@@ -15,7 +13,9 @@ if (
     window.close();
   };
   ws.onmessage = (ev) => {
-    const { type, message } = JSON.parse(ev.data) as WsMessage;
+    /** @type {import("../../index").WsMessage} */
+    const data = JSON.parse(ev.data)
+    const { message, type } = data;
     switch (type) {
       case "html":
         root.srcdoc = message;

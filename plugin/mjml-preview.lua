@@ -3,7 +3,7 @@ local command = vim.api.nvim_create_user_command
 vim.g.mjml_preview_debug = false
 
 local dirname = vim.fs.dirname(vim.fn.expand("<sfile>:p"))
-local script_path = vim.fn.resolve(dirname .. "/../app/dist/server.js")
+local script_path = vim.fn.resolve(dirname .. "/../app/src/index.js")
 
 command("MjmlPreviewOpen", function()
 	require("mjml-preview").spawn_server(script_path)
