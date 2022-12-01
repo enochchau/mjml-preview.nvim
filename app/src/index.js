@@ -102,6 +102,7 @@ function setupNvim() {
               socketSend(socket, { type: "end" });
             });
 
+            sockets.forEach((socket) => socket.close());
             BufferSockets.delete(bufnr);
           }
           break;

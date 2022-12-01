@@ -37,7 +37,6 @@ function wsConnect() {
     /** @type {import("../../index").WsMessage} */
     const data = JSON.parse(ev.data);
     const { message, type } = data;
-    console.log("RX", data);
     switch (type) {
       case "html":
         root.srcdoc = message;
