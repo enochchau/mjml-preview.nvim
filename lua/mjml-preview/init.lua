@@ -21,28 +21,33 @@ M.spawn_server = function(script_path)
 	})
 end
 
-local function notify(method)
-	vim.rpcnotify(vim.g.mjml_preview_channel, method, vim.fn.bufnr("%"))
+local function notify(method, bufnr)
+	vim.rpcnotify(vim.g.mjml_preview_channel, method, bufnr)
 end
 
-local function request(method)
-	return vim.rpcrequest(vim.g.mjml_preview_channel, method, vim.fn.bufnr("%"))
+local function request(method, bufnr)
+	return vim.rpcrequest(vim.g.mjml_preview_channel, method, bufnr)
 end
 
-M.send_write = function()
-	notify("write")
+M.send_write = function(bufnr)
+	bufnr = bufnr or vim.fn.bufnr("%")
+	notify("write", bufnr)
 end
 
-M.send_open = function()
-	notify("open")
+M.send_open = function(bufnr)
+	bufnr = bufnr or vim.fn.bufnr("%")
+	notify("open", bufnr)
 end
 
-M.send_close = function()
-	notify("close")
+M.send_close = function(bufnr)
+	bufnr = bufnr or vim.fn.bufnr("%")
+	notify("close", bufnr)
 end
 
-M.toggle = function()
-	local is_open = request("check_open")
+M.toggle = function(bufnr)
+	bufnr = bufnr or vim.fn.bufnr("%")
+	local is_open = request("check_open", bufnr)
+	debug(bufnr, "has open state: ", is_open)
 	if is_open == "true" then
 		M.send_close()
 	else

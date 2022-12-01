@@ -1,6 +1,6 @@
 local command = vim.api.nvim_create_user_command
 
-vim.g.mjml_preview_debug = false
+vim.g.mjml_preview_debug = true
 
 local dirname = vim.fs.dirname(vim.fn.expand("<sfile>:p"))
 local script_path = vim.fn.resolve(dirname .. "/../app/src/index.js")
@@ -30,12 +30,20 @@ end
 
 autocmd("BufDelete", function()
 	if require("mjml-preview").is_active() then
-		require("mjml-preview").send_close()
+		require("mjml-preview").send_close(vim.fn.bufnr("<abuf>"))
 	end
 end)
 
 autocmd({ "TextChanged", "TextChangedI" }, function()
 	if require("mjml-preview").is_active() then
 		require("mjml-preview").send_write()
+	end
+end)
+
+autocmd("VimLeavePre", function()
+	if require("mjml-preview").is_active() then
+		for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+			require("mjml-preview").send_close(bufnr)
+		end
 	end
 end)

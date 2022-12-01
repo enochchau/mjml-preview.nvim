@@ -34,4 +34,11 @@ export type WsMessage =
   | {
       type: "error";
       message: string[];
+    }
+  | {
+      type: "start";
+      message: { bufnr: string };
+    }
+  | {
+      type: "end";
     };

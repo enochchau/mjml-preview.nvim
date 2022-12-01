@@ -5,18 +5,19 @@ const mjml2html = require("mjml");
 const { WebSocketServer } = require("ws");
 const path = require("path");
 const open = require("open");
-const { attach } = require("neovim");
+const { attach, NeovimClient } = require("neovim");
 
 const PORT = 55476;
 const HOST = "localhost";
 const URL = `http://${HOST}:${PORT}`;
-
-// track unattached buffers
-/** @type {string[]} */
-const UnattachedBuffers = [];
+/**
+ * Get URL for a bufnr
+ * @param {string} bufnr
+ */
+const getUrl = (bufnr) => URL + "/buffer/" + bufnr;
 
 // tracks buffer ids to its associated web socket client and nvim buffer
-/** @type {Map<string, {socket: WebSocket, buffer: import("neovim").Buffer}>} */
+/** @type {Map<string, Set<WebSocket>>} */
 const BufferSockets = new Map();
 
 /**
@@ -27,6 +28,17 @@ const BufferSockets = new Map();
  */
 function socketSend(socket, message) {
   return socket.send(JSON.stringify(message));
+}
+
+/**
+ * Find neovim buffer
+ * @param {NeovimClient} nvim
+ * @param {string} bufnr
+ * @returns {Promise<import("neovim").Buffer | undefined>}
+ */
+async function findBuffer(nvim, bufnr) {
+  let id = parseInt(bufnr);
+  return (await nvim.buffers).find((b) => b.id === id);
 }
 
 /**
@@ -66,26 +78,31 @@ function setupNvim() {
     async (method, args) => {
       /** @type {import("./").RPCNotify} */
       const rpcFn = { method, args };
-      const bufnr = args[0];
+      const bufnr = args[0].toString();
       switch (rpcFn.method) {
         case "open":
-          if (!BufferSockets.has(bufnr)) {
-            open(URL);
-            // push into unattached buffers, this will get picked up when a new ws client connects
-            UnattachedBuffers.push(bufnr);
-          }
+          open(getUrl(bufnr));
           break;
         case "write": {
-          const bs = BufferSockets.get(bufnr);
-          if (bs) {
-            sendMjmlBuf(bs.socket, bs.buffer);
+          let buffer = await findBuffer(nvim, bufnr);
+          if (buffer) {
+            const sockets = BufferSockets.get(bufnr);
+            if (sockets) {
+              sockets.forEach((socket) => {
+                sendMjmlBuf(socket, buffer);
+              });
+            }
           }
           break;
         }
         case "close": {
-          const bs = BufferSockets.get(bufnr);
-          if (bs) {
-            bs.socket.close();
+          const sockets = BufferSockets.get(bufnr);
+          if (sockets) {
+            sockets.forEach((socket) => {
+              socketSend(socket, { type: "end" });
+            });
+
+            BufferSockets.delete(bufnr);
           }
           break;
         }
@@ -98,15 +115,15 @@ function setupNvim() {
     /**
      * @param {string} method
      * @param {string[]} args
-     * @param {{send: (...args: string[]) => void }} rsp
+     * @param {{ send: (...args: string[]) => void }} rsp
      */
     async (method, args, resp) => {
       /** @type {import("./").RPCRequest} */
       const rpcFn = { method, args };
-      const bufnr = args[0];
+      const bufnr = args[0].toString();
       switch (rpcFn.method) {
         case "check_open": {
-          const is_open = BufferSockets.has(bufnr);
+          const is_open = BufferSockets.get(bufnr)?.size > 0;
           resp.send(is_open.toString());
         }
       }
@@ -120,7 +137,8 @@ function setupNvim() {
 
   // static file server
   const server = http.createServer((req, res) => {
-    if (req.url === "/" || !req.url) req.url = "index.html";
+    let re = /^\/buffer\/[0-9]+/;
+    if (req.url === "/" || !req.url || re.test(req.url)) req.url = "index.html";
     const r = path.join(__dirname, "public", req.url);
     fs.readFile(r, (err, data) => {
       if (err) {
@@ -139,26 +157,37 @@ function setupNvim() {
   });
 
   wsServer.on("connection", async (socket) => {
-    const bufnr = UnattachedBuffers.pop();
-    if (!bufnr) return;
+    let bufnr;
 
-    socket.on("close", () => {
-      // auto-clean up
-      BufferSockets.delete(bufnr);
+    socket.on("message", async (raw) => {
+      /** @type import("./").WsMessage */
+      let data = JSON.parse(raw.toString());
+      if (data.type === "start") {
+        bufnr = data.message.bufnr;
+
+        let buffer = await findBuffer(nvim, bufnr);
+
+        if (!buffer) {
+          socket.close();
+          return;
+        }
+
+        let allSockets = BufferSockets.get(bufnr);
+
+        if (!allSockets) {
+          BufferSockets.set(bufnr, new Set([socket]));
+        } else {
+          BufferSockets.set(bufnr, allSockets.add(socket));
+        }
+
+        sendMjmlBuf(socket, buffer);
+      }
     });
 
-    if (BufferSockets.has(bufnr)) {
-      socket.close();
-    }
-
-    const buffers = await nvim.buffers;
-    const buffer = buffers.find((b) => b.id === parseInt(bufnr));
-    if (!buffer) {
-      socket.close();
-      return;
-    }
-    BufferSockets.set(bufnr, { socket, buffer });
-    sendMjmlBuf(socket, buffer);
+    socket.on("close", () => {
+      let sockets = BufferSockets.get(bufnr);
+      if (sockets) sockets.delete(socket);
+    });
   });
 
   server.on("upgrade", (req, socket, head) => {
