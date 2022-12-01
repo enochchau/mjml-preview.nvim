@@ -42,7 +42,13 @@ function wsConnect() {
         root.srcdoc = message;
         break;
       case "error":
-        errorEl.innerHTML = message.map((m) => `<p>${m}</p>`).join("");
+        if (message.length > 0) {
+          errorEl.innerHTML =
+            `<h3 style="color:indianred;">Error:</h3>` +
+            message.map((m) => `<p>${m}</p>`).join("");
+        } else {
+          errorEl.innerHTML = "";
+        }
         break;
       case "end":
         window.close();
