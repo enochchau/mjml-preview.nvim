@@ -1,11 +1,6 @@
 const WS_URL = "ws://localhost:55476/ws";
 const RECONNECT_DELAY = 1000;
 
-/** @type HTMLIFrameElement */
-const root = document.getElementById("root");
-/** @type HTMLDivElement */
-const errorEl = document.getElementById("error");
-
 wsConnect();
 
 /**
@@ -38,17 +33,10 @@ function wsConnect() {
     const data = JSON.parse(ev.data);
     const { message, type } = data;
     switch (type) {
-      case "html":
-        root.srcdoc = message;
-        break;
-      case "error":
-        if (message.length > 0) {
-          errorEl.innerHTML =
-            `<h3 style="color:indianred;">Error:</h3>` +
-            message.map((m) => `<p>${m}</p>`).join("");
-        } else {
-          errorEl.innerHTML = "";
-        }
+      case "data":
+        // console.log("RX", message);
+        document.getElementById("root").srcdoc = message.html;
+        document.getElementById("error").innerHTML = message.errors;
         break;
       case "end":
         window.close();

@@ -28,12 +28,11 @@ type RPCRequest = {
  */
 export type WsMessage =
   | {
-      type: "html";
-      message: string;
-    }
-  | {
-      type: "error";
-      message: string[];
+      type: "data";
+      message: {
+        html?: string;
+        errors: string[];
+      }
     }
   | {
       type: "start";

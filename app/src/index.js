@@ -42,28 +42,41 @@ async function findBuffer(nvim, bufnr) {
 }
 
 /**
+ * @param {import("neovim").Buffer} buf - nvim buffer
+ */
+async function processBuf(buf) {
+  const lines = await buf.lines;
+  const mjml = lines.join("\n");
+  try {
+    const { html, errors } = mjml2html(mjml);
+    return { html, errors: errors.map((e) => e.formattedMessage) };
+  } catch (err) {
+    return { errors: [err.message, mjml] };
+  }
+}
+
+/**
+ * @param {string[]} errors
+ * @returns {string}
+ */
+function errorsToHtml(errors) {
+  return errors.length > 0
+    ? `<h3 style="color:indianred;">Error:</h3>` +
+        errors.map((m) => `<p>${m}</p>`).join("")
+    : "";
+}
+
+/**
  * Convert and send the buffer to the web socket client
  * @param {import("ws").WebSocket} socket - ws client socket
  * @param {import("neovim").Buffer} buf - nvim buffer
  */
 async function sendMjmlBuf(socket, buf) {
-  const lines = await buf.lines;
-  const mjml = lines.join("\n");
-  try {
-    const { html, errors } = mjml2html(mjml);
-    socketSend(socket, { type: "html", message: html });
-    socketSend(socket, {
-      type: "error",
-      message: errors.map((e) => e.formattedMessage),
-    });
-  } catch (err) {
-    if (err instanceof Error) {
-      socketSend(socket, {
-        type: "error",
-        message: [err.message, mjml],
-      });
-    }
-  }
+  const { html, errors } = await processBuf(buf);
+  socketSend(socket, {
+    type: "data",
+    message: { html, errors: errorsToHtml(errors) },
+  });
 }
 
 function setupNvim() {
@@ -138,8 +151,13 @@ function setupNvim() {
 
   // static file server
   const server = http.createServer((req, res) => {
-    let re = /^\/buffer\/[0-9]+/;
-    if (req.url === "/" || !req.url || re.test(req.url)) req.url = "index.html";
+    if (typeof req.url === "string") {
+      let re = /^\/buffer\/([0-9]+)/;
+      // TODO: server side rendering
+      if (re.test(req.url)) {
+        req.url = "index.html";
+      }
+    }
     const r = path.join(__dirname, "public", req.url);
     fs.readFile(r, (err, data) => {
       if (err) {
