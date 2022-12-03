@@ -100,7 +100,6 @@ function setupNvim() {
           break;
         case "write": {
           let buffer = await findBuffer(nvim, bufnr);
-          console.log("found buffer", buffer.id);
           if (buffer) {
             const sockets = BufferSockets.get(bufnr);
             if (sockets) {
