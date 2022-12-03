@@ -1,4 +1,5 @@
 const http = require("http");
+const Mustache = require("mustache");
 const process = require("process");
 const fs = require("fs");
 const mjml2html = require("mjml");
@@ -38,7 +39,8 @@ function socketSend(socket, message) {
  */
 async function findBuffer(nvim, bufnr) {
   let id = parseInt(bufnr);
-  return (await nvim.buffers).find((b) => b.id === id);
+  let buffers = await nvim.buffers;
+  return buffers.find((b) => b.id === id);
 }
 
 /**
@@ -98,6 +100,7 @@ function setupNvim() {
           break;
         case "write": {
           let buffer = await findBuffer(nvim, bufnr);
+          console.log("found buffer", buffer.id);
           if (buffer) {
             const sockets = BufferSockets.get(bufnr);
             if (sockets) {
@@ -150,24 +153,40 @@ function setupNvim() {
   const nvim = setupNvim();
 
   // static file server
-  const server = http.createServer((req, res) => {
+  const server = http.createServer(async (req, res) => {
+    /** @type {{html: string, errors: string} | undefined} */
+    let values;
+
     if (typeof req.url === "string") {
       let re = /^\/buffer\/([0-9]+)/;
-      // TODO: server side rendering
-      if (re.test(req.url)) {
-        req.url = "index.html";
+      // server side rendering
+      if (typeof req.url === "string") {
+        let match = req.url.match(re);
+        if (match) {
+          req.url = "index.html";
+          let bufnr = match[1];
+          let buffer = await findBuffer(nvim, bufnr);
+          if (buffer) {
+            let res = await processBuf(buffer);
+            values = { html: res.html, errors: errorsToHtml(res.errors) };
+          }
+        }
       }
     }
+
     const r = path.join(__dirname, "public", req.url);
-    fs.readFile(r, (err, data) => {
-      if (err) {
-        res.writeHead(404);
-        res.end(JSON.stringify(err));
-        return;
+    try {
+      let data = await fs.promises.readFile(r);
+      if (values) {
+        data = data.toString();
+        data = Mustache.render(data, values);
       }
       res.writeHead(200);
       res.end(data);
-    });
+    } catch (err) {
+      res.writeHead(404);
+      res.end(JSON.stringify(err));
+    }
   });
 
   const wsServer = new WebSocketServer({

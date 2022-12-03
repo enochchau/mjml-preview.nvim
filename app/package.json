@@ -8,10 +8,12 @@
   "license": "ISC",
   "devDependencies": {
     "@types/mjml": "^4.7.0",
+    "@types/mustache": "^4.2.2",
     "@types/ws": "^8.5.3"
   },
   "dependencies": {
     "mjml": "^4.13.0",
+    "mustache": "^4.2.0",
     "neovim": "^4.10.1",
     "open": "^8.4.0",
     "ws": "^8.8.1"
